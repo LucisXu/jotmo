@@ -1694,32 +1694,29 @@ func getCatResponseHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Cat response generated for note_id=%d, response_len=%d", req.NoteID, len(catResponse))
 
-	// 保存猫咪回复到笔记
-	if req.NoteID > 0 {
-		dataMutex.Lock()
-		saved := false
-		for i := range data.Notes {
-			if data.Notes[i].ID == req.NoteID && data.Notes[i].UserID == userID {
-				data.Notes[i].CatResponse = catResponse
-				saveData()
-				saved = true
-				log.Printf("Cat response saved for note_id=%d", req.NoteID)
-				break
-			}
-		}
-		if !saved {
-			log.Printf("Note not found for note_id=%d, user_id=%d", req.NoteID, userID)
-		}
-		dataMutex.Unlock()
-	} else {
-		log.Printf("No note_id provided, cat response not saved")
-	}
-
+	// 立即返回响应给前端，不等待保存
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"cat_name":     "知知",
 		"cat_response": catResponse,
 	})
+
+	// 异步保存猫咪回复到笔记（不阻塞HTTP响应）
+	if req.NoteID > 0 {
+		go func(noteID, uID int, response string) {
+			dataMutex.Lock()
+			defer dataMutex.Unlock()
+			for i := range data.Notes {
+				if data.Notes[i].ID == noteID && data.Notes[i].UserID == uID {
+					data.Notes[i].CatResponse = response
+					saveData()
+					log.Printf("Cat response saved for note_id=%d", noteID)
+					return
+				}
+			}
+			log.Printf("Note not found for note_id=%d, user_id=%d", noteID, uID)
+		}(req.NoteID, userID, catResponse)
+	}
 }
 
 func importNotesHandler(w http.ResponseWriter, r *http.Request) {
