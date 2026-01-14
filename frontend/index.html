@@ -10466,10 +10466,28 @@
             // 记住当前是否是知知模式
             const wasZhizhiMode = isZhizhiMode;
 
-            // 立即清空输入框并禁用按钮
+            // 立即清空输入框并恢复按钮（不等待服务器响应）
             textarea.value = '';
             btn.disabled = true;
 
+            // 乐观更新：立即在列表中显示新快记
+            const tempNote = {
+                id: Date.now(), // 临时ID
+                content: content,
+                created_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+                _isTemp: true,
+                _isZhizhiMode: wasZhizhiMode
+            };
+            allNotes.unshift(tempNote);
+            renderNotes(allNotes, allNotes.length);
+            btn.disabled = false;
+
+            // 如果是知知模式，显示提示
+            if (wasZhizhiMode) {
+                showToast('快记已发送，知知正在思考...');
+            }
+
+            // 后台发送请求
             try {
                 const response = await fetch(API_BASE + '/api/notes', {
                     method: 'POST',
@@ -10484,25 +10502,57 @@
 
                 const result = await response.json();
 
-                // 立即刷新列表
-                loadNotes();
+                // 替换临时快记为真实快记
+                const tempIndex = allNotes.findIndex(n => n._isTemp && n.content === content);
+                if (tempIndex !== -1 && result.note) {
+                    allNotes[tempIndex] = result.note;
+                    renderNotes(allNotes, allNotes.length);
+                }
+
                 // 延迟刷新分类
                 setTimeout(() => loadCategories(), 2000);
 
-                // 知知模式：始终获取知知回应
+                // 知知模式：异步获取知知回应（不显示思考提示，用toast代替）
                 if (wasZhizhiMode && result.note && result.note.id) {
-                    fetchCatResponse(result.note.id, content, true);
+                    fetchCatResponseQuiet(result.note.id, content);
                 }
-                // 非知知模式：如果需要猫咪回应，异步获取（不阻塞UI）
+                // 非知知模式：如果需要猫咪回应，异步获取
                 else if (result.cat_name === 'pending' && result.note && result.note.id) {
                     fetchCatResponse(result.note.id, content, false);
                 }
             } catch (err) {
+                // 移除临时快记
+                const tempIndex = allNotes.findIndex(n => n._isTemp && n.content === content);
+                if (tempIndex !== -1) {
+                    allNotes.splice(tempIndex, 1);
+                    renderNotes(allNotes, allNotes.length);
+                }
                 showToast('保存失败，请重试');
-                // 恢复内容
                 textarea.value = content;
-            } finally {
-                btn.disabled = false;
+            }
+        }
+
+        // 静默获取知知回应（不显示思考弹窗）
+        async function fetchCatResponseQuiet(noteId, content) {
+            try {
+                const response = await fetch(API_BASE + '/api/notes/cat-response', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + currentUser.token
+                    },
+                    body: JSON.stringify({ note_id: noteId, content: content, zhizhi_mode: true })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    if (result.cat_response) {
+                        showZhizhiBubble(result.cat_response);
+                        loadNotes();
+                    }
+                }
+            } catch (err) {
+                console.log('Cat response failed:', err);
             }
         }
 
