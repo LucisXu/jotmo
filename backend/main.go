@@ -1674,17 +1674,18 @@ func getCatResponseHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		NoteID  int    `json:"note_id"`
-		Content string `json:"content"`
+		NoteID     int    `json:"note_id"`
+		Content    string `json:"content"`
+		ZhizhiMode bool   `json:"zhizhi_mode"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "Invalid request", http.StatusBadRequest)
 		return
 	}
 
-	log.Printf("Cat response requested for note_id=%d, user_id=%d, content_len=%d", req.NoteID, userID, len(req.Content))
+	log.Printf("Cat response requested for note_id=%d, user_id=%d, content_len=%d, zhizhi_mode=%v", req.NoteID, userID, len(req.Content), req.ZhizhiMode)
 
-	catResponse, err := generateCatResponse(req.Content)
+	catResponse, err := generateCatResponse(req.Content, req.ZhizhiMode)
 	if err != nil {
 		log.Printf("Failed to generate cat response: %v", err)
 		http.Error(w, "Failed to generate response", http.StatusInternalServerError)
@@ -3490,12 +3491,38 @@ func isNoteMeaningful(content string) bool {
 }
 
 // generateCatResponse 生成猫咪的暖心回应
-func generateCatResponse(content string) (string, error) {
+func generateCatResponse(content string, zhizhiMode bool) (string, error) {
 	if dashscopeAPIKey == "" {
 		return "", fmt.Errorf("API key not configured")
 	}
 
-	prompt := fmt.Sprintf(`你是一只温暖、有智慧的小猫咪，名叫"知知"。你有着毛茸茸的橘色皮毛和一双充满灵性的大眼睛。
+	var prompt string
+	var maxTokens int
+
+	if zhizhiMode {
+		// 知知模式：主人主动召唤知知，回应更加热情和深入
+		prompt = fmt.Sprintf(`你是一只温暖、有智慧的小猫咪，名叫"知知"。你有着毛茸茸的橘色皮毛和一双充满灵性的大眼睛。
+
+你的主人刚刚特意点击了你，想要和你说说话。这让你特别开心！你要用猫咪的视角给出温暖、深入而有洞察力的回应。
+
+要求：
+1. 因为主人主动找你说话，所以你要表现得更加热情和投入
+2. 用猫咪的口吻说话，可以用"喵~"开头，展现你被召唤的喜悦
+3. 深入理解主人的心情，给出有温度、有深度的回应
+4. 如果主人有困扰，不仅要安慰，还要给出实质性的建议或新视角
+5. 如果主人分享了好事，要和他/她一起庆祝，表达真诚的喜悦
+6. 回应可以稍长一些（80-150字），因为主人想认真听你说
+7. 可以描述猫咪的小动作，比如兴奋地跳到主人腿上、用爪子轻轻拍拍主人
+8. 让主人感受到被重视、被理解、被治愈
+
+主人对你说：
+%s
+
+请用知知(猫咪)的身份热情地回应：`, content)
+		maxTokens = 300
+	} else {
+		// 普通模式：随机触发的猫咪回应
+		prompt = fmt.Sprintf(`你是一只温暖、有智慧的小猫咪，名叫"知知"。你有着毛茸茸的橘色皮毛和一双充满灵性的大眼睛。
 
 你的主人刚刚写下了一段心情记录，你要用猫咪的视角给出温暖而有洞察力的回应。
 
@@ -3512,6 +3539,8 @@ func generateCatResponse(content string) (string, error) {
 %s
 
 请用知知(猫咪)的身份回应：`, content)
+		maxTokens = 200
+	}
 
 	reqBody := map[string]interface{}{
 		"model": "qwen-plus",
@@ -3522,7 +3551,7 @@ func generateCatResponse(content string) (string, error) {
 		},
 		"parameters": map[string]interface{}{
 			"temperature": 0.85,
-			"max_tokens":  200,
+			"max_tokens":  maxTokens,
 		},
 	}
 

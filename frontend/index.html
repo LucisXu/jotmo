@@ -1337,6 +1337,485 @@
             flex-shrink: 0;
         }
 
+        /* 知知猫发送按钮图标切换 */
+        .send-icon-cat {
+            display: none;
+            font-size: 20px;
+        }
+
+        .zhizhi-mode .send-icon-default {
+            display: none;
+        }
+
+        .zhizhi-mode .send-icon-cat {
+            display: inline;
+        }
+
+        /* ==================== 知知猫样式 ==================== */
+        .zhizhi-cat {
+            position: absolute;
+            bottom: 100%;
+            left: 20px;
+            width: 40px;
+            height: 32px;
+            cursor: pointer;
+            z-index: 10;
+            transition: transform 0.3s ease;
+            /* 默认走动动画 */
+            animation: catWalk 8s ease-in-out infinite;
+        }
+
+        .zhizhi-cat:hover {
+            transform: scale(1.1);
+        }
+
+        /* 猫身体容器 */
+        .cat-body {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 猫头 */
+        .cat-head {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 22px;
+            height: 18px;
+            background: linear-gradient(135deg, #ffa94d 0%, #ff922b 100%);
+            border-radius: 50% 50% 45% 45%;
+            z-index: 3;
+        }
+
+        /* 猫耳朵 */
+        .cat-ear {
+            position: absolute;
+            top: -6px;
+            width: 10px;
+            height: 12px;
+            background: linear-gradient(135deg, #ffa94d 0%, #ff922b 100%);
+            border-radius: 50% 50% 0 0;
+            z-index: 2;
+        }
+
+        .cat-ear::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 5px;
+            height: 6px;
+            background: rgba(255, 200, 180, 0.8);
+            border-radius: 50% 50% 0 0;
+        }
+
+        .cat-ear-left {
+            left: 0;
+            transform: rotate(-15deg);
+        }
+
+        .cat-ear-right {
+            right: 0;
+            transform: rotate(15deg);
+        }
+
+        /* 猫脸 */
+        .cat-face {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 猫眼睛 */
+        .cat-eye {
+            position: absolute;
+            top: 6px;
+            width: 6px;
+            height: 6px;
+            background: #fff;
+            border-radius: 50%;
+            overflow: hidden;
+        }
+
+        .cat-eye-left { left: 3px; }
+        .cat-eye-right { right: 3px; }
+
+        .cat-pupil {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 3px;
+            height: 4px;
+            background: #2d3436;
+            border-radius: 50%;
+            transition: all 0.2s ease;
+        }
+
+        /* 猫鼻子 */
+        .cat-nose {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 3px;
+            background: #e17055;
+            border-radius: 50% 50% 40% 40%;
+        }
+
+        /* 猫嘴巴 */
+        .cat-mouth {
+            position: absolute;
+            top: 12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 8px;
+            height: 4px;
+            border: none;
+            border-bottom: 1.5px solid #636e72;
+            border-radius: 0 0 50% 50%;
+        }
+
+        /* 猫胡须 */
+        .cat-whiskers {
+            position: absolute;
+            top: 11px;
+            width: 12px;
+            height: 6px;
+        }
+
+        .cat-whiskers::before,
+        .cat-whiskers::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 1px;
+            background: rgba(100, 100, 100, 0.4);
+        }
+
+        .cat-whiskers::before { top: 0; }
+        .cat-whiskers::after { top: 3px; }
+
+        .cat-whiskers-left {
+            left: -8px;
+            transform: rotate(-5deg);
+        }
+
+        .cat-whiskers-right {
+            right: -8px;
+            transform: rotate(5deg);
+        }
+
+        /* 猫身体 */
+        .cat-torso {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 24px;
+            height: 12px;
+            background: linear-gradient(135deg, #ffa94d 0%, #ff922b 100%);
+            border-radius: 50% 50% 40% 40%;
+            z-index: 1;
+        }
+
+        /* 猫尾巴 */
+        .cat-tail {
+            position: absolute;
+            bottom: 2px;
+            right: -8px;
+            width: 16px;
+            height: 6px;
+            background: linear-gradient(90deg, #ff922b, #ffa94d);
+            border-radius: 0 50% 50% 0;
+            transform-origin: left center;
+            animation: tailWag 1.5s ease-in-out infinite;
+            z-index: 0;
+        }
+
+        /* 猫爪子 */
+        .cat-paws {
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .cat-paw {
+            width: 6px;
+            height: 4px;
+            background: #ffa94d;
+            border-radius: 50%;
+        }
+
+        /* Zzz 打呼效果 */
+        .cat-zzz {
+            position: absolute;
+            top: -8px;
+            right: -5px;
+            font-size: 8px;
+            font-weight: bold;
+            color: var(--text-3);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .cat-zzz span {
+            display: inline-block;
+        }
+
+        /* 走动动画 */
+        @keyframes catWalk {
+            0%, 100% {
+                left: 20px;
+                transform: scaleX(1);
+            }
+            45% {
+                left: calc(100% - 60px);
+                transform: scaleX(1);
+            }
+            50% {
+                left: calc(100% - 60px);
+                transform: scaleX(-1);
+            }
+            95% {
+                left: 20px;
+                transform: scaleX(-1);
+            }
+        }
+
+        /* 尾巴摇摆 */
+        @keyframes tailWag {
+            0%, 100% { transform: rotate(-10deg); }
+            50% { transform: rotate(15deg); }
+        }
+
+        /* ===== 睡觉状态 ===== */
+        .zhizhi-cat.is-sleeping {
+            animation: catSleepPosition 20s ease-in-out infinite;
+        }
+
+        .zhizhi-cat.is-sleeping .cat-body {
+            transform: rotate(-10deg);
+        }
+
+        .zhizhi-cat.is-sleeping .cat-eye {
+            height: 2px;
+            top: 8px;
+        }
+
+        .zhizhi-cat.is-sleeping .cat-pupil {
+            opacity: 0;
+        }
+
+        .zhizhi-cat.is-sleeping .cat-tail {
+            animation: tailSleepWag 3s ease-in-out infinite;
+        }
+
+        .zhizhi-cat.is-sleeping .cat-zzz {
+            opacity: 1;
+            animation: zzzFloat 2s ease-in-out infinite;
+        }
+
+        .zhizhi-cat.is-sleeping .cat-zzz span:nth-child(1) {
+            animation: zzzFloat 2s ease-in-out infinite 0.3s;
+        }
+
+        .zhizhi-cat.is-sleeping .cat-zzz span:nth-child(2) {
+            animation: zzzFloat 2s ease-in-out infinite 0.6s;
+        }
+
+        @keyframes catSleepPosition {
+            0%, 100% { left: 30%; }
+            50% { left: 35%; }
+        }
+
+        @keyframes tailSleepWag {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+
+        @keyframes zzzFloat {
+            0%, 100% {
+                opacity: 0.3;
+                transform: translateY(0);
+            }
+            50% {
+                opacity: 1;
+                transform: translateY(-4px);
+            }
+        }
+
+        /* ===== 趴着打呼状态 ===== */
+        .zhizhi-cat.is-lying {
+            animation: catLyingPosition 25s ease-in-out infinite;
+        }
+
+        .zhizhi-cat.is-lying .cat-body {
+            transform: scaleY(0.7) translateY(4px);
+        }
+
+        .zhizhi-cat.is-lying .cat-head {
+            bottom: 4px;
+        }
+
+        .zhizhi-cat.is-lying .cat-eye {
+            height: 2px;
+            top: 8px;
+        }
+
+        .zhizhi-cat.is-lying .cat-pupil {
+            opacity: 0;
+        }
+
+        .zhizhi-cat.is-lying .cat-torso {
+            height: 8px;
+            animation: breathe 2s ease-in-out infinite;
+        }
+
+        .zhizhi-cat.is-lying .cat-zzz {
+            opacity: 1;
+            animation: zzzFloat 2s ease-in-out infinite;
+        }
+
+        @keyframes catLyingPosition {
+            0%, 100% { left: 50%; transform: translateX(-50%); }
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: translateX(-50%) scaleY(1); }
+            50% { transform: translateX(-50%) scaleY(1.15); }
+        }
+
+        /* ===== 倾听状态（鼠标靠近） ===== */
+        .zhizhi-cat.is-listening {
+            animation: none !important;
+            left: 20px !important;
+            transform: scale(1.05) scaleX(1) !important;
+            transition: left 0.3s ease-out, transform 0.3s ease-out;
+        }
+
+        .zhizhi-cat.is-listening .cat-body {
+            transform: none;
+            animation: catPerk 0.3s ease-out forwards;
+        }
+
+        .zhizhi-cat.is-listening .cat-ear-left {
+            animation: earPerkLeft 0.3s ease-out forwards;
+        }
+
+        .zhizhi-cat.is-listening .cat-ear-right {
+            animation: earPerkRight 0.3s ease-out forwards;
+        }
+
+        .zhizhi-cat.is-listening .cat-eye {
+            height: 8px !important;
+            width: 7px;
+        }
+
+        .zhizhi-cat.is-listening .cat-pupil {
+            opacity: 1 !important;
+            width: 4px;
+            height: 5px;
+            animation: lookAround 2s ease-in-out infinite;
+        }
+
+        .zhizhi-cat.is-listening .cat-tail {
+            animation: tailExcited 0.5s ease-in-out infinite;
+        }
+
+        .zhizhi-cat.is-listening .cat-zzz {
+            opacity: 0 !important;
+        }
+
+        @keyframes catPerk {
+            0% { transform: rotate(-10deg) scaleY(0.7); }
+            100% { transform: rotate(0deg) scaleY(1); }
+        }
+
+        @keyframes earPerkLeft {
+            0% { transform: rotate(-15deg); }
+            50% { transform: rotate(-25deg); }
+            100% { transform: rotate(-20deg); }
+        }
+
+        @keyframes earPerkRight {
+            0% { transform: rotate(15deg); }
+            50% { transform: rotate(25deg); }
+            100% { transform: rotate(20deg); }
+        }
+
+        @keyframes lookAround {
+            0%, 100% { transform: translate(-50%, -50%); }
+            25% { transform: translate(-30%, -50%); }
+            75% { transform: translate(-70%, -50%); }
+        }
+
+        @keyframes tailExcited {
+            0%, 100% { transform: rotate(-15deg); }
+            50% { transform: rotate(20deg); }
+        }
+
+        /* ===== 激活状态（知知模式） ===== */
+        .zhizhi-cat.is-active {
+            animation: none !important;
+            left: 20px !important;
+            transform: scale(1.1) scaleX(1) !important;
+            filter: drop-shadow(0 0 8px rgba(255, 169, 77, 0.6));
+        }
+
+        .zhizhi-cat.is-active .cat-body {
+            animation: catBounce 0.6s ease-in-out infinite;
+        }
+
+        .zhizhi-cat.is-active .cat-eye {
+            height: 8px !important;
+            width: 7px;
+        }
+
+        .zhizhi-cat.is-active .cat-pupil {
+            opacity: 1 !important;
+            background: #e17055;
+            width: 4px;
+            height: 5px;
+        }
+
+        .zhizhi-cat.is-active .cat-mouth {
+            border-bottom-color: #e17055;
+            height: 5px;
+        }
+
+        .zhizhi-cat.is-active .cat-tail {
+            animation: tailHappy 0.4s ease-in-out infinite;
+        }
+
+        @keyframes catBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-3px); }
+        }
+
+        @keyframes tailHappy {
+            0%, 100% { transform: rotate(-20deg); }
+            50% { transform: rotate(25deg); }
+        }
+
+        /* 知知模式输入框样式 */
+        .zhizhi-mode .composer-textarea::placeholder {
+            color: #ffa94d;
+        }
+
+        .zhizhi-mode .bottom-composer-inner {
+            border-color: rgba(255, 169, 77, 0.4);
+            box-shadow: 0 0 20px rgba(255, 169, 77, 0.15), var(--shadow-2);
+        }
+
         /* Adjust notes list padding for bottom composer */
         .notes-list {
             padding-bottom: 100px;
@@ -1838,10 +2317,216 @@
         .note-card {
             padding: 20px;
             cursor: default;
+            position: relative;
+            overflow: visible;
         }
 
         .note-card:hover {
             transform: translateY(-2px);
+        }
+
+        /* ==================== 快记悬停粒子效果 ==================== */
+        .note-particles {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            overflow: visible;
+            z-index: 10;
+        }
+
+        .note-particle {
+            position: absolute;
+            pointer-events: none;
+            animation-fill-mode: forwards;
+        }
+
+        /* Galaxy主题 - 星尘粒子 */
+        [data-theme="galaxy"] .note-particle {
+            width: 3px;
+            height: 3px;
+            background: radial-gradient(circle, rgba(150, 200, 255, 1) 0%, rgba(100, 150, 255, 0.6) 50%, transparent 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 6px rgba(100, 180, 255, 0.8), 0 0 12px rgba(138, 43, 226, 0.4);
+            animation: galaxyParticleFloat 2s ease-out forwards;
+        }
+
+        [data-theme="galaxy"] .note-particle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 8px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(150, 200, 255, 0.6), transparent);
+            transform: translate(-50%, -50%);
+        }
+
+        @keyframes galaxyParticleFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0) translateX(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-60px) translateX(var(--drift-x, 10px)) scale(0.3);
+            }
+        }
+
+        /* Forest主题 - 萤火虫/花瓣 */
+        [data-theme="forest"] .note-particle {
+            width: 4px;
+            height: 4px;
+            background: radial-gradient(circle, rgba(180, 255, 150, 1) 0%, rgba(120, 220, 100, 0.7) 40%, transparent 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(150, 255, 100, 0.9), 0 0 16px rgba(100, 200, 80, 0.5);
+            animation: forestParticleFloat 2.5s ease-out forwards;
+        }
+
+        [data-theme="forest"] .note-particle.is-petal {
+            width: 6px;
+            height: 10px;
+            background: linear-gradient(135deg, rgba(200, 255, 180, 0.8) 0%, rgba(150, 230, 130, 0.5) 100%);
+            border-radius: 50% 0 50% 0;
+            box-shadow: none;
+            animation: forestPetalFloat 3s ease-out forwards;
+        }
+
+        @keyframes forestParticleFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0) translateX(0) scale(1);
+            }
+            50% {
+                opacity: 0.9;
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px) translateX(var(--drift-x, 15px)) scale(0.5);
+            }
+        }
+
+        @keyframes forestPetalFloat {
+            0% {
+                opacity: 0.9;
+                transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-70px) translateX(var(--drift-x, 20px)) rotate(180deg) scale(0.6);
+            }
+        }
+
+        /* Angel主题 - 羽毛/圣光粒子 */
+        [data-theme="angel"] .note-particle {
+            width: 3px;
+            height: 3px;
+            background: radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(255, 240, 200, 0.8) 40%, transparent 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255, 250, 220, 0.9), 0 0 20px rgba(255, 220, 150, 0.5);
+            animation: angelParticleFloat 2s ease-out forwards;
+        }
+
+        [data-theme="angel"] .note-particle.is-feather {
+            width: 8px;
+            height: 20px;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95) 0%, rgba(255, 250, 240, 0.7) 50%, rgba(255, 245, 230, 0.3) 100%);
+            border-radius: 50% 50% 20% 20%;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+            animation: angelFeatherFloat 3s ease-out forwards;
+        }
+
+        @keyframes angelParticleFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-55px) translateX(var(--drift-x, 5px)) scale(0.4);
+            }
+        }
+
+        @keyframes angelFeatherFloat {
+            0% {
+                opacity: 0.9;
+                transform: translateY(0) translateX(0) rotate(-10deg) scale(1);
+            }
+            50% {
+                transform: translateY(-30px) translateX(10px) rotate(10deg) scale(0.9);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-80px) translateX(var(--drift-x, -5px)) rotate(-20deg) scale(0.5);
+            }
+        }
+
+        /* Passion主题 - 火焰羽毛 */
+        [data-theme="passion"] .note-particle {
+            width: 4px;
+            height: 4px;
+            background: radial-gradient(circle, rgba(255, 200, 100, 1) 0%, rgba(255, 150, 50, 0.8) 40%, transparent 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 8px rgba(255, 180, 80, 0.9), 0 0 16px rgba(255, 100, 50, 0.5);
+            animation: passionSparkFloat 1.8s ease-out forwards;
+        }
+
+        [data-theme="passion"] .note-particle.is-flame-feather {
+            width: 10px;
+            height: 24px;
+            background: linear-gradient(to top,
+                rgba(255, 100, 0, 0.9) 0%,
+                rgba(255, 150, 50, 0.8) 30%,
+                rgba(255, 200, 100, 0.6) 60%,
+                rgba(255, 220, 150, 0.3) 100%);
+            border-radius: 50% 50% 20% 20%;
+            box-shadow:
+                0 0 10px rgba(255, 150, 50, 0.8),
+                0 0 20px rgba(255, 100, 0, 0.5),
+                inset 0 -5px 10px rgba(255, 50, 0, 0.3);
+            animation: passionFeatherFloat 2.5s ease-out forwards;
+        }
+
+        [data-theme="passion"] .note-particle.is-flame-feather::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 8px;
+            background: radial-gradient(ellipse at bottom, rgba(255, 255, 200, 0.9) 0%, transparent 70%);
+        }
+
+        @keyframes passionSparkFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-45px) translateX(var(--drift-x, 8px)) scale(0.2);
+            }
+        }
+
+        @keyframes passionFeatherFloat {
+            0% {
+                opacity: 0.95;
+                transform: translateY(0) translateX(0) rotate(0deg) scale(1);
+                filter: brightness(1);
+            }
+            30% {
+                opacity: 0.9;
+                filter: brightness(1.2);
+            }
+            60% {
+                opacity: 0.6;
+                filter: brightness(1.1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-90px) translateX(var(--drift-x, 10px)) rotate(15deg) scale(0.4);
+                filter: brightness(0.8);
+            }
         }
 
         .note-content {
@@ -4361,6 +5046,124 @@
 
         .cat-close:hover {
             opacity: 1;
+        }
+
+        /* 知知专属气泡样式 */
+        .zhizhi-bubble-overlay {
+            bottom: 120px;
+        }
+
+        .zhizhi-bubble {
+            border: 1px solid rgba(255, 169, 77, 0.5) !important;
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 80px rgba(255, 169, 77, 0.25) !important;
+            background: linear-gradient(145deg, rgba(40, 30, 20, 0.98), rgba(30, 25, 15, 0.98)) !important;
+        }
+
+        .zhizhi-avatar {
+            flex-shrink: 0;
+            width: 52px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            background: linear-gradient(135deg, #ffa94d 0%, #ff922b 100%);
+            border-radius: 50%;
+            box-shadow: 0 4px 16px rgba(255, 169, 77, 0.5);
+            animation: zhizhiPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes zhizhiPulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 4px 16px rgba(255, 169, 77, 0.5); }
+            50% { transform: scale(1.05); box-shadow: 0 6px 24px rgba(255, 169, 77, 0.7); }
+        }
+
+        .zhizhi-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .zhizhi-name {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #ffa94d;
+            margin-bottom: 6px;
+        }
+
+        .zhizhi-message {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-1);
+            white-space: pre-wrap;
+        }
+
+        /* 知知思考中提示 */
+        .zhizhi-thinking {
+            position: fixed;
+            bottom: 120px;
+            left: 50%;
+            transform: translateX(-50%) translateY(10px);
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s ease-out;
+            pointer-events: none;
+        }
+
+        .zhizhi-thinking.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .zhizhi-thinking-content {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            background: linear-gradient(145deg, rgba(40, 30, 20, 0.95), rgba(30, 25, 15, 0.95));
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 169, 77, 0.4);
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 40px rgba(255, 169, 77, 0.15);
+        }
+
+        .zhizhi-thinking-emoji {
+            font-size: 24px;
+            animation: zhizhiThinkBounce 1s ease-in-out infinite;
+        }
+
+        @keyframes zhizhiThinkBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+
+        .zhizhi-thinking-text {
+            font-size: 0.9rem;
+            color: #ffa94d;
+            font-weight: 500;
+        }
+
+        .zhizhi-thinking-dots {
+            display: flex;
+            gap: 2px;
+        }
+
+        .zhizhi-thinking-dots span {
+            font-size: 1.2rem;
+            color: #ffa94d;
+            animation: zhizhiDotPulse 1.4s ease-in-out infinite;
+        }
+
+        .zhizhi-thinking-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .zhizhi-thinking-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes zhizhiDotPulse {
+            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+            30% { opacity: 1; transform: translateY(-3px); }
         }
 
         /* Theme-specific cat bubble */
@@ -8693,11 +9496,36 @@
     <!-- Bottom Composer (Chat-style) -->
     <div class="bottom-composer" id="bottomComposer">
         <div class="bottom-composer-inner">
+            <!-- 知知猫 -->
+            <div class="zhizhi-cat" id="zhizhiCat" onclick="toggleZhizhiMode()">
+                <div class="cat-body">
+                    <div class="cat-head">
+                        <div class="cat-ear cat-ear-left"></div>
+                        <div class="cat-ear cat-ear-right"></div>
+                        <div class="cat-face">
+                            <div class="cat-eye cat-eye-left"><div class="cat-pupil"></div></div>
+                            <div class="cat-eye cat-eye-right"><div class="cat-pupil"></div></div>
+                            <div class="cat-nose"></div>
+                            <div class="cat-mouth"></div>
+                            <div class="cat-whiskers cat-whiskers-left"></div>
+                            <div class="cat-whiskers cat-whiskers-right"></div>
+                        </div>
+                    </div>
+                    <div class="cat-torso"></div>
+                    <div class="cat-tail"></div>
+                    <div class="cat-paws">
+                        <div class="cat-paw cat-paw-left"></div>
+                        <div class="cat-paw cat-paw-right"></div>
+                    </div>
+                </div>
+                <div class="cat-zzz">Z<span>z</span><span>z</span></div>
+            </div>
             <textarea id="noteContent" class="composer-textarea" placeholder="记录此刻的想法..." rows="1"></textarea>
             <button class="btn-compose" id="saveBtn" onclick="createNote()" title="发送">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <svg class="send-icon-default" width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
+                <span class="send-icon-cat">🐱</span>
             </button>
         </div>
     </div>
@@ -8990,6 +9818,130 @@
         let noteImages = {}; // 时光回廊：note_id -> image info
         let corridorStatus = null; // 时光回廊处理状态
         let corridorPollingTimer = null;
+
+        // 知知猫状态
+        let isZhizhiMode = false;
+        let catState = 'walking'; // walking, sleeping, lying, listening, active
+        let catStateTimer = null;
+        let catIdleTimer = null;
+
+        // ==================== 知知猫逻辑 ====================
+        function setupZhizhiCat() {
+            const cat = document.getElementById('zhizhiCat');
+            const composer = document.getElementById('bottomComposer');
+            if (!cat || !composer) return;
+
+            // 随机切换猫的空闲状态
+            startCatIdleCycle();
+
+            // 监听鼠标靠近
+            composer.addEventListener('mouseenter', handleComposerMouseEnter);
+            composer.addEventListener('mouseleave', handleComposerMouseLeave);
+        }
+
+        function startCatIdleCycle() {
+            // 随机在走动、睡觉、趴着之间切换
+            function setRandomIdleState() {
+                if (isZhizhiMode) return; // 知知模式时不切换
+
+                const cat = document.getElementById('zhizhiCat');
+                if (!cat) return;
+
+                // 移除所有状态
+                cat.classList.remove('is-sleeping', 'is-lying', 'is-listening', 'is-active');
+
+                const states = ['walking', 'walking', 'sleeping', 'lying']; // 走动概率更高
+                const randomState = states[Math.floor(Math.random() * states.length)];
+                catState = randomState;
+
+                if (randomState === 'sleeping') {
+                    cat.classList.add('is-sleeping');
+                } else if (randomState === 'lying') {
+                    cat.classList.add('is-lying');
+                }
+                // walking 不需要额外的 class
+
+                // 设置下一次状态切换
+                const duration = randomState === 'walking' ? 8000 : (10000 + Math.random() * 10000);
+                catStateTimer = setTimeout(setRandomIdleState, duration);
+            }
+
+            // 启动循环
+            setRandomIdleState();
+        }
+
+        function handleComposerMouseEnter() {
+            if (isZhizhiMode) return;
+
+            const cat = document.getElementById('zhizhiCat');
+            if (!cat) return;
+
+            // 清除状态切换定时器
+            if (catStateTimer) {
+                clearTimeout(catStateTimer);
+                catStateTimer = null;
+            }
+
+            // 切换到倾听状态
+            cat.classList.remove('is-sleeping', 'is-lying');
+            cat.classList.add('is-listening');
+            catState = 'listening';
+        }
+
+        function handleComposerMouseLeave() {
+            if (isZhizhiMode) return;
+
+            const cat = document.getElementById('zhizhiCat');
+            if (!cat) return;
+
+            // 延迟恢复空闲状态
+            catIdleTimer = setTimeout(() => {
+                cat.classList.remove('is-listening');
+                startCatIdleCycle();
+            }, 500);
+        }
+
+        function toggleZhizhiMode() {
+            isZhizhiMode = !isZhizhiMode;
+
+            const cat = document.getElementById('zhizhiCat');
+            const composer = document.querySelector('.bottom-composer-inner');
+            const textarea = document.getElementById('noteContent');
+
+            if (!cat || !composer || !textarea) return;
+
+            // 清除定时器
+            if (catStateTimer) {
+                clearTimeout(catStateTimer);
+                catStateTimer = null;
+            }
+            if (catIdleTimer) {
+                clearTimeout(catIdleTimer);
+                catIdleTimer = null;
+            }
+
+            if (isZhizhiMode) {
+                // 激活知知模式
+                cat.classList.remove('is-sleeping', 'is-lying', 'is-listening');
+                cat.classList.add('is-active');
+                composer.classList.add('zhizhi-mode');
+                textarea.placeholder = '知知听你说...';
+                catState = 'active';
+
+                // 显示提示
+                showToast('知知模式已开启，快记将获得知知的回应 🐱');
+            } else {
+                // 退出知知模式
+                cat.classList.remove('is-active');
+                composer.classList.remove('zhizhi-mode');
+                textarea.placeholder = '记录此刻的想法...';
+
+                // 恢复空闲状态循环
+                startCatIdleCycle();
+
+                showToast('知知模式已关闭');
+            }
+        }
 
         // ==================== User Dropdown ====================
         document.getElementById('userButton')?.addEventListener('click', (e) => {
@@ -9354,6 +10306,102 @@
             });
         }
 
+        // 快记卡片悬停粒子效果
+        function setupNoteParticles() {
+            const notesList = document.getElementById('notesList');
+            if (!notesList) return;
+
+            // 使用事件委托
+            notesList.addEventListener('mouseenter', handleNoteHover, true);
+            notesList.addEventListener('mouseleave', handleNoteLeave, true);
+        }
+
+        const particleIntervals = new WeakMap();
+
+        function handleNoteHover(e) {
+            const card = e.target.closest('.note-card');
+            if (!card || particleIntervals.has(card)) return;
+
+            // 开始生成粒子
+            const interval = setInterval(() => {
+                createNoteParticle(card);
+            }, 150); // 每150ms生成一个粒子
+
+            particleIntervals.set(card, interval);
+
+            // 立即生成几个粒子
+            for (let i = 0; i < 3; i++) {
+                setTimeout(() => createNoteParticle(card), i * 50);
+            }
+        }
+
+        function handleNoteLeave(e) {
+            const card = e.target.closest('.note-card');
+            if (!card) return;
+
+            const interval = particleIntervals.get(card);
+            if (interval) {
+                clearInterval(interval);
+                particleIntervals.delete(card);
+            }
+        }
+
+        function createNoteParticle(card) {
+            const theme = document.body.dataset.theme || 'galaxy';
+            const particle = document.createElement('div');
+            particle.className = 'note-particle';
+
+            // 根据主题设置粒子类型（只有特殊粒子需要额外的class）
+            // 默认粒子不需要额外class，特殊粒子需要对应class
+            const specialParticleChance = {
+                galaxy: 0,           // galaxy只有一种粒子
+                forest: 0.3,         // 30%概率出现花瓣
+                angel: 0.25,         // 25%概率出现羽毛
+                passion: 0.35        // 35%概率出现火焰羽毛
+            };
+
+            const specialClass = {
+                forest: 'is-petal',
+                angel: 'is-feather',
+                passion: 'is-flame-feather'
+            };
+
+            // 判断是否生成特殊粒子
+            const isSpecial = Math.random() < (specialParticleChance[theme] || 0);
+            if (isSpecial && specialClass[theme]) {
+                particle.classList.add(specialClass[theme]);
+            }
+
+            // 随机位置（在卡片范围内）
+            const rect = card.getBoundingClientRect();
+            const x = Math.random() * (rect.width - 20) + 10;
+
+            particle.style.left = x + 'px';
+            particle.style.bottom = '10px';
+            particle.style.setProperty('--drift-x', (Math.random() * 40 - 20) + 'px');
+
+            // 添加到卡片
+            card.style.position = 'relative';
+            card.appendChild(particle);
+
+            // 动画结束后移除
+            let duration = 2000; // 默认
+            if (isSpecial) {
+                if (theme === 'passion') duration = 2500;
+                else if (theme === 'angel') duration = 3000;
+                else if (theme === 'forest') duration = 3000;
+            } else {
+                if (theme === 'galaxy') duration = 2000;
+                else if (theme === 'forest') duration = 2500;
+                else if (theme === 'angel') duration = 2000;
+                else if (theme === 'passion') duration = 1800;
+            }
+
+            setTimeout(() => {
+                particle.remove();
+            }, duration);
+        }
+
         // Infinite scroll
         function setupInfiniteScroll() {
             window.addEventListener('scroll', () => {
@@ -9415,6 +10463,9 @@
             const btn = document.getElementById('saveBtn');
             const textarea = document.getElementById('noteContent');
 
+            // 记住当前是否是知知模式
+            const wasZhizhiMode = isZhizhiMode;
+
             // 立即清空输入框并禁用按钮
             textarea.value = '';
             btn.disabled = true;
@@ -9426,7 +10477,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + currentUser.token
                     },
-                    body: JSON.stringify({ content })
+                    body: JSON.stringify({ content, zhizhi_mode: wasZhizhiMode })
                 });
 
                 if (!response.ok) throw new Error('Failed to create note');
@@ -9438,9 +10489,13 @@
                 // 延迟刷新分类
                 setTimeout(() => loadCategories(), 2000);
 
-                // 如果需要猫咪回应，异步获取（不阻塞UI）
-                if (result.cat_name === 'pending' && result.note && result.note.id) {
-                    fetchCatResponse(result.note.id, content);
+                // 知知模式：始终获取知知回应
+                if (wasZhizhiMode && result.note && result.note.id) {
+                    fetchCatResponse(result.note.id, content, true);
+                }
+                // 非知知模式：如果需要猫咪回应，异步获取（不阻塞UI）
+                else if (result.cat_name === 'pending' && result.note && result.note.id) {
+                    fetchCatResponse(result.note.id, content, false);
                 }
             } catch (err) {
                 showToast('保存失败，请重试');
@@ -9452,7 +10507,12 @@
         }
 
         // 异步获取猫咪回应
-        async function fetchCatResponse(noteId, content) {
+        async function fetchCatResponse(noteId, content, isZhizhi = false) {
+            // 知知模式显示思考提示
+            if (isZhizhi) {
+                showZhizhiThinking();
+            }
+
             try {
                 const response = await fetch(API_BASE + '/api/notes/cat-response', {
                     method: 'POST',
@@ -9460,21 +10520,113 @@
                         'Content-Type': 'application/json',
                         'Authorization': 'Bearer ' + currentUser.token
                     },
-                    body: JSON.stringify({ note_id: noteId, content: content })
+                    body: JSON.stringify({ note_id: noteId, content: content, zhizhi_mode: isZhizhi })
                 });
+
+                // 移除思考提示
+                hideZhizhiThinking();
 
                 if (response.ok) {
                     const result = await response.json();
                     if (result.cat_response) {
-                        showCatBubble(result.cat_name, result.cat_response);
+                        // 知知模式使用专属的显示方式
+                        if (isZhizhi) {
+                            showZhizhiBubble(result.cat_response);
+                        } else {
+                            showCatBubble(result.cat_name, result.cat_response);
+                        }
                         // 刷新列表以显示猫咪图标
                         loadNotes();
                     }
+                } else {
+                    if (isZhizhi) {
+                        showToast('知知暂时无法回应，请稍后再试');
+                    }
                 }
             } catch (err) {
+                hideZhizhiThinking();
                 console.log('Cat response failed:', err);
-                // 静默失败，不影响用户体验
+                if (isZhizhi) {
+                    showToast('知知暂时无法回应，请稍后再试');
+                }
             }
+        }
+
+        // 显示知知思考中的提示
+        function showZhizhiThinking() {
+            // 移除已有的
+            hideZhizhiThinking();
+
+            const thinking = document.createElement('div');
+            thinking.className = 'zhizhi-thinking';
+            thinking.id = 'zhizhiThinking';
+            thinking.innerHTML = `
+                <div class="zhizhi-thinking-content">
+                    <span class="zhizhi-thinking-emoji">🐱</span>
+                    <span class="zhizhi-thinking-text">知知正在思考...</span>
+                    <span class="zhizhi-thinking-dots"><span>.</span><span>.</span><span>.</span></span>
+                </div>
+            `;
+            document.body.appendChild(thinking);
+
+            // 添加显示动画
+            requestAnimationFrame(() => {
+                thinking.classList.add('show');
+            });
+        }
+
+        function hideZhizhiThinking() {
+            const thinking = document.getElementById('zhizhiThinking');
+            if (thinking) {
+                thinking.classList.remove('show');
+                setTimeout(() => thinking.remove(), 300);
+            }
+        }
+
+        // 显示知知回应气泡（专属样式）
+        function showZhizhiBubble(message) {
+            // 移除已有的气泡
+            const existing = document.querySelector('.cat-bubble-overlay');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.className = 'cat-bubble-overlay zhizhi-bubble-overlay';
+            overlay.innerHTML = `
+                <div class="cat-bubble zhizhi-bubble">
+                    <div class="zhizhi-avatar">🐱</div>
+                    <div class="zhizhi-content">
+                        <div class="zhizhi-name">知知说</div>
+                        <div class="zhizhi-message">${escapeHtml(message)}</div>
+                    </div>
+                    <button class="cat-close" onclick="this.closest('.cat-bubble-overlay').remove()" title="关闭">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+
+            // 添加显示动画
+            requestAnimationFrame(() => {
+                overlay.classList.add('show');
+            });
+
+            // 点击背景关闭
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) {
+                    overlay.classList.remove('show');
+                    setTimeout(() => overlay.remove(), 300);
+                }
+            });
+
+            // 自动关闭（延长时间让用户阅读）
+            setTimeout(() => {
+                if (overlay.parentNode) {
+                    overlay.classList.remove('show');
+                    setTimeout(() => overlay.remove(), 300);
+                }
+            }, 10000);
         }
 
         // 显示猫咪回应气泡
@@ -11428,6 +12580,8 @@
         checkAuth();
         setupNavScroll();
         setupInfiniteScroll();
+        setupNoteParticles();
+        setupZhizhiCat();
         setupTextareaAutoResize();
     </script>
 </body>
