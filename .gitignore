@@ -1,0 +1,35 @@
+# Binaries
+backend/jotmo
+*.exe
+
+# Logs
+*.log
+server.log
+
+# Data files (contains user data)
+backend/data.json
+backend/jotmo_data.json
+*.json.bak
+
+# Environment files
+.env
+*.env
+
+# Start script with API keys
+backend/start.sh
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Go
+backend/tmp/
+
+# Node modules (if any)
+node_modules/

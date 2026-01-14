@@ -1,0 +1,5 @@
+#!/bin/bash
+# Copy this file to start.sh and fill in your API key
+export DASHSCOPE_API_KEY="your-dashscope-api-key-here"
+export PORT=8088
+./jotmo > server.log 2>&1
