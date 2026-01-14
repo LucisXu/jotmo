@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"image"
+	"image/jpeg"
+	_ "image/png"
 	"io"
 	"log"
 	"math"
 	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,11 +26,14 @@ import (
 )
 
 var (
-	jwtSecret        = []byte("jotmo-secret-key-medieval-2024")
-	dataFile         = "jotmo_data.json"
-	dataMutex        sync.RWMutex
-	dashscopeAPIKey  = os.Getenv("DASHSCOPE_API_KEY")
-	skipNameGen      = false // 跳过分类名称生成（用于离线重聚类）
+	jwtSecret              = []byte("jotmo-secret-key-medieval-2024")
+	dataFile               = "jotmo_data.json"
+	dataMutex              sync.RWMutex
+	dashscopeAPIKey        = os.Getenv("DASHSCOPE_API_KEY")
+	skipNameGen            = false // 跳过分类名称生成（用于离线重聚类）
+	activeCorridorProcess  = make(map[int]bool) // 跟踪活跃的时光回廊处理任务
+	pausedCorridorProcess  = make(map[int]bool) // 跟踪暂停的时光回廊处理任务
+	corridorProcessMutex   sync.RWMutex
 )
 
 func getEnv(key, defaultVal string) string {
@@ -87,6 +94,36 @@ type Data struct {
 	UserInsights   map[int]*InsightReport   `json:"user_insights,omitempty"`
 	UserStarlight  map[int]*StarlightCache  `json:"user_starlight,omitempty"`
 	UserBiography  map[int]*BiographyReport `json:"user_biography,omitempty"`
+	// 时光回廊 - 快记图片
+	NoteImages     map[int]*NoteImage       `json:"note_images,omitempty"`
+	// 时光回廊批量处理状态
+	CorridorStatus map[int]*CorridorProcessStatus `json:"corridor_status,omitempty"`
+}
+
+// NoteImage 快记生成的场景图片
+type NoteImage struct {
+	NoteID        int    `json:"note_id"`
+	ImageURL      string `json:"image_url"`       // 图片 URL（DashScope 临时链接或本地存储路径）
+	LocalPath     string `json:"local_path"`      // 本地存储路径
+	ThumbnailPath string `json:"thumbnail_path"`  // 缩略图路径
+	Prompt        string `json:"prompt"`          // 生成使用的 prompt
+	Status        string `json:"status"`          // pending, generating, completed, failed, not_suitable
+	TaskID        string `json:"task_id"`         // DashScope 任务 ID
+	GeneratedAt   string `json:"generated_at"`    // 生成时间
+	Error         string `json:"error"`           // 错误信息
+}
+
+// CorridorProcessStatus 时光回廊批量处理状态
+type CorridorProcessStatus struct {
+	Status           string `json:"status"`            // idle, processing, paused, completed, interrupted, error
+	TotalNotes       int    `json:"total_notes"`       // 总快记数
+	ProcessedNotes   int    `json:"processed_notes"`   // 已处理数
+	SuccessCount     int    `json:"success_count"`     // 成功生成数
+	FailedCount      int    `json:"failed_count"`      // 失败数
+	NotSuitableCount int    `json:"not_suitable_count"` // 不适合生成图片的数量
+	LastProcessedAt  string `json:"last_processed_at"` // 最后处理时间
+	StartedAt        string `json:"started_at"`        // 开始时间
+	Error            string `json:"error"`             // 错误信息
 }
 
 // StarlightCache Starlight 报告缓存
@@ -1579,6 +1616,27 @@ func createNoteHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			saveData()
+		}
+	}()
+
+	// 异步生成时光回廊图片（如果适合）
+	go func() {
+		if isNoteSuitableForImage(req.Content) {
+			log.Printf("Note %d is suitable for image generation", newNote.ID)
+			noteImage, err := processNoteImage(newNote.ID, req.Content)
+			if err != nil {
+				log.Printf("Failed to generate image for note %d: %v", newNote.ID, err)
+			} else {
+				log.Printf("Image generated for note %d: %s", newNote.ID, noteImage.Status)
+			}
+
+			dataMutex.Lock()
+			if data.NoteImages == nil {
+				data.NoteImages = make(map[int]*NoteImage)
+			}
+			data.NoteImages[newNote.ID] = noteImage
+			saveData()
+			dataMutex.Unlock()
 		}
 	}()
 
@@ -4124,6 +4182,939 @@ func migrateEmbeddings(userID int, specificNoteIDs []int) {
 	log.Printf("Migration completed for user %d", userID)
 }
 
+// ============ 时光回廊 - 图片生成 ============
+
+// isNoteSuitableForImage 判断快记是否适合生成场景图片
+func isNoteSuitableForImage(content string) bool {
+	runeContent := []rune(content)
+	// 至少30个字符，且是有意义的内容
+	if len(runeContent) < 30 {
+		return false
+	}
+
+	// 排除纯图片/链接的内容
+	// 移除所有 markdown 图片语法 ![...](...)
+	imagePattern := regexp.MustCompile(`!\[.*?\]\([^)]+\)`)
+	cleanContent := imagePattern.ReplaceAllString(content, "")
+	// 移除所有 URL
+	urlPattern := regexp.MustCompile(`https?://[^\s]+`)
+	cleanContent = urlPattern.ReplaceAllString(cleanContent, "")
+	// 移除所有 markdown 链接 [...](...)
+	linkPattern := regexp.MustCompile(`\[.*?\]\([^)]+\)`)
+	cleanContent = linkPattern.ReplaceAllString(cleanContent, "")
+
+	// 清理后的内容太短，说明主要是图片/链接
+	cleanRunes := []rune(strings.TrimSpace(cleanContent))
+	if len(cleanRunes) < 20 {
+		return false
+	}
+
+	// 场景类关键词 - 表示有具体场景/画面的内容
+	scenePatterns := []string{
+		// 时间场景
+		"早上", "中午", "下午", "晚上", "深夜", "凌晨", "黄昏", "清晨", "傍晚",
+		"今天", "昨天", "刚才", "此刻", "这会儿",
+		// 地点场景
+		"在家", "办公室", "咖啡厅", "公园", "路上", "地铁", "公交", "房间", "窗边", "床上",
+		"街上", "超市", "商场", "餐厅", "图书馆", "学校", "医院",
+		// 天气/环境
+		"阳光", "月光", "星空", "雨", "雪", "风", "云", "天空", "日落", "日出",
+		// 动作/状态
+		"看着", "望着", "听着", "走在", "坐在", "躺在", "站在", "等待", "漫步",
+		"喝着", "吃着", "看书", "听歌", "发呆", "思考", "回忆",
+		// 感官描述
+		"看到", "听到", "闻到", "感受到", "触摸",
+		// 情景描写
+		"突然", "慢慢", "静静", "安静", "热闹", "孤独", "温暖", "寒冷",
+	}
+
+	matchCount := 0
+	for _, pattern := range scenePatterns {
+		if strings.Contains(cleanContent, pattern) {
+			matchCount++
+		}
+	}
+
+	// 至少匹配2个场景关键词，或清理后内容足够长（超过80字）
+	return matchCount >= 2 || len(cleanRunes) >= 80
+}
+
+// generateImagePrompt 使用 AI 根据快记内容生成图片 prompt
+func generateImagePrompt(content string) (string, error) {
+	if dashscopeAPIKey == "" {
+		return "", fmt.Errorf("DASHSCOPE_API_KEY not set")
+	}
+
+	systemPrompt := `你是一个专业的图片提示词生成器。用户会给你一段个人日记/快记内容，你需要根据内容生成一个适合文生图模型的英文提示词。
+
+要求：
+1. 捕捉文字中描述的场景、氛围和情感
+2. 使用具体、视觉化的描述词
+3. 包含光线、色调、构图等元素
+4. 风格偏向温暖、治愈、有意境的插画风格
+5. 提示词用英文，长度100-200词
+6. 不要出现任何文字/字母在画面中
+7. 如果内容是抽象的情感，转化为具象的视觉隐喻
+8. 只输出提示词，不要任何解释
+
+示例输入：今天下班后一个人在咖啡厅坐了很久，看着窗外的雨发呆，不知道在想什么，就是觉得需要这样安静一会儿。
+
+示例输出：A solitary figure sitting by a cafe window on a rainy evening, soft warm interior lighting contrasts with the cool blue rain outside, condensation on glass, blurred city lights through raindrops, contemplative mood, cozy atmosphere, illustration style, muted warm color palette with touches of blue, peaceful melancholy, slice of life scene, detailed background with coffee cup on table`
+
+	reqBody := map[string]interface{}{
+		"model": "qwen-plus",
+		"input": map[string]interface{}{
+			"messages": []map[string]string{
+				{"role": "system", "content": systemPrompt},
+				{"role": "user", "content": content},
+			},
+		},
+		"parameters": map[string]interface{}{
+			"max_tokens":   300,
+			"temperature":  0.7,
+		},
+	}
+
+	jsonBody, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest("POST", "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+dashscopeAPIKey)
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("API request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("API returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Output struct {
+			Text    string `json:"text"`
+			Choices []struct {
+				Message struct {
+					Content string `json:"content"`
+				} `json:"message"`
+			} `json:"choices"`
+		} `json:"output"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	prompt := result.Output.Text
+	if prompt == "" && len(result.Output.Choices) > 0 {
+		prompt = result.Output.Choices[0].Message.Content
+	}
+
+	return strings.TrimSpace(prompt), nil
+}
+
+// submitImageGenTask 提交图片生成任务到 DashScope
+func submitImageGenTask(prompt string) (string, error) {
+	if dashscopeAPIKey == "" {
+		return "", fmt.Errorf("DASHSCOPE_API_KEY not set")
+	}
+
+	reqBody := map[string]interface{}{
+		"model": "wanx-v1",
+		"input": map[string]interface{}{
+			"prompt": prompt,
+		},
+		"parameters": map[string]interface{}{
+			"style": "<auto>",
+			"size":  "1024*1024",
+			"n":     1,
+		},
+	}
+
+	jsonBody, _ := json.Marshal(reqBody)
+	req, _ := http.NewRequest("POST", "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis", bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+dashscopeAPIKey)
+	req.Header.Set("X-DashScope-Async", "enable")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("API request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("API returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Output struct {
+			TaskID     string `json:"task_id"`
+			TaskStatus string `json:"task_status"`
+		} `json:"output"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	return result.Output.TaskID, nil
+}
+
+// checkImageGenTask 检查图片生成任务状态
+func checkImageGenTask(taskID string) (status string, imageURL string, err error) {
+	if dashscopeAPIKey == "" {
+		return "", "", fmt.Errorf("DASHSCOPE_API_KEY not set")
+	}
+
+	req, _ := http.NewRequest("GET", "https://dashscope.aliyuncs.com/api/v1/tasks/"+taskID, nil)
+	req.Header.Set("Authorization", "Bearer "+dashscopeAPIKey)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("API request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		return "", "", fmt.Errorf("API returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Output struct {
+			TaskStatus string `json:"task_status"`
+			Results    []struct {
+				URL string `json:"url"`
+			} `json:"results"`
+		} `json:"output"`
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", "", fmt.Errorf("failed to parse response: %v", err)
+	}
+
+	if result.Output.TaskStatus == "SUCCEEDED" && len(result.Output.Results) > 0 {
+		return "SUCCEEDED", result.Output.Results[0].URL, nil
+	}
+
+	return result.Output.TaskStatus, "", nil
+}
+
+// downloadAndSaveImage 下载图片并保存到本地
+func downloadAndSaveImage(imageURL string, noteID int) (localPath string, thumbnailPath string, err error) {
+	// 创建 images 目录
+	imagesDir := "./images"
+	thumbDir := "./images/thumbnails"
+	if err := os.MkdirAll(imagesDir, 0755); err != nil {
+		return "", "", fmt.Errorf("failed to create images directory: %v", err)
+	}
+	if err := os.MkdirAll(thumbDir, 0755); err != nil {
+		return "", "", fmt.Errorf("failed to create thumbnails directory: %v", err)
+	}
+
+	// 下载图片
+	resp, err := http.Get(imageURL)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to download image: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// 读取图片数据
+	imgData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read image data: %v", err)
+	}
+
+	// 生成文件名
+	timestamp := time.Now().Format("20060102150405")
+	filename := fmt.Sprintf("note_%d_%s.png", noteID, timestamp)
+	thumbFilename := fmt.Sprintf("note_%d_%s_thumb.jpg", noteID, timestamp)
+	localPath = imagesDir + "/" + filename
+	thumbnailPath = thumbDir + "/" + thumbFilename
+
+	// 保存原图
+	if err := os.WriteFile(localPath, imgData, 0644); err != nil {
+		return "", "", fmt.Errorf("failed to save image: %v", err)
+	}
+
+	// 生成缩略图
+	if err := generateThumbnail(imgData, thumbnailPath, 400); err != nil {
+		log.Printf("Warning: failed to generate thumbnail for note %d: %v", noteID, err)
+		// 缩略图生成失败不影响主流程，返回空的缩略图路径
+		thumbnailPath = ""
+	}
+
+	return localPath, thumbnailPath, nil
+}
+
+// generateThumbnail 生成缩略图
+func generateThumbnail(imgData []byte, outputPath string, maxWidth int) error {
+	// 解码图片
+	img, _, err := image.Decode(bytes.NewReader(imgData))
+	if err != nil {
+		return fmt.Errorf("failed to decode image: %v", err)
+	}
+
+	// 计算缩略图尺寸
+	bounds := img.Bounds()
+	origWidth := bounds.Dx()
+	origHeight := bounds.Dy()
+
+	if origWidth <= maxWidth {
+		// 图片已经足够小，直接复制
+		return os.WriteFile(outputPath, imgData, 0644)
+	}
+
+	// 计算新尺寸，保持宽高比
+	newWidth := maxWidth
+	newHeight := (origHeight * maxWidth) / origWidth
+
+	// 创建缩略图
+	thumb := image.NewRGBA(image.Rect(0, 0, newWidth, newHeight))
+
+	// 简单的最近邻缩放算法
+	for y := 0; y < newHeight; y++ {
+		for x := 0; x < newWidth; x++ {
+			srcX := x * origWidth / newWidth
+			srcY := y * origHeight / newHeight
+			thumb.Set(x, y, img.At(srcX, srcY))
+		}
+	}
+
+	// 保存为 JPEG（更小的文件大小）
+	outFile, err := os.Create(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to create thumbnail file: %v", err)
+	}
+	defer outFile.Close()
+
+	if err := jpeg.Encode(outFile, thumb, &jpeg.Options{Quality: 75}); err != nil {
+		return fmt.Errorf("failed to encode thumbnail: %v", err)
+	}
+
+	return nil
+}
+
+// processNoteImage 处理单条快记的图片生成（同步等待结果）
+func processNoteImage(noteID int, content string) (*NoteImage, error) {
+	noteImage := &NoteImage{
+		NoteID: noteID,
+		Status: "generating",
+	}
+
+	// 生成 prompt
+	prompt, err := generateImagePrompt(content)
+	if err != nil {
+		noteImage.Status = "failed"
+		noteImage.Error = "生成提示词失败: " + err.Error()
+		return noteImage, err
+	}
+	noteImage.Prompt = prompt
+
+	// 提交图片生成任务
+	taskID, err := submitImageGenTask(prompt)
+	if err != nil {
+		noteImage.Status = "failed"
+		noteImage.Error = "提交任务失败: " + err.Error()
+		return noteImage, err
+	}
+	noteImage.TaskID = taskID
+
+	// 轮询检查任务状态（最多等待3分钟）
+	maxRetries := 36
+	for i := 0; i < maxRetries; i++ {
+		time.Sleep(5 * time.Second)
+
+		status, imageURL, err := checkImageGenTask(taskID)
+		if err != nil {
+			log.Printf("Check task %s failed: %v", taskID, err)
+			continue
+		}
+
+		if status == "SUCCEEDED" {
+			// 下载并保存图片（包括缩略图）
+			localPath, thumbPath, err := downloadAndSaveImage(imageURL, noteID)
+			if err != nil {
+				log.Printf("Download image failed for note %d: %v", noteID, err)
+				noteImage.ImageURL = imageURL // 保留临时 URL
+			} else {
+				noteImage.LocalPath = localPath
+				noteImage.ThumbnailPath = thumbPath
+			}
+			noteImage.ImageURL = imageURL
+			noteImage.Status = "completed"
+			noteImage.GeneratedAt = time.Now().Format("2006-01-02 15:04:05")
+			return noteImage, nil
+		} else if status == "FAILED" {
+			noteImage.Status = "failed"
+			noteImage.Error = "图片生成失败"
+			return noteImage, fmt.Errorf("image generation failed")
+		}
+		// PENDING 或 RUNNING 继续等待
+	}
+
+	noteImage.Status = "failed"
+	noteImage.Error = "生成超时"
+	return noteImage, fmt.Errorf("image generation timeout")
+}
+
+// getCorridorStatusHandler 获取时光回廊处理状态
+func getCorridorStatusHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	userID, _, err := validateToken(tokenString)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	// 使用写锁，因为可能需要保存过滤结果
+	dataMutex.Lock()
+	defer dataMutex.Unlock()
+
+	// 获取用户的处理状态
+	var status *CorridorProcessStatus
+	if data.CorridorStatus != nil {
+		status = data.CorridorStatus[userID]
+	}
+
+	// 检查是否有过时的处理状态（服务重启后 goroutine 丢失）
+	corridorProcessMutex.RLock()
+	isActiveProcess := activeCorridorProcess[userID]
+	corridorProcessMutex.RUnlock()
+
+	if status != nil && status.Status == "processing" && !isActiveProcess {
+		// 处理状态显示 processing 但实际没有活跃的 goroutine，重置状态
+		status.Status = "interrupted"
+		status.Error = "处理被中断（服务重启），请重新开始"
+		if data.CorridorStatus == nil {
+			data.CorridorStatus = make(map[int]*CorridorProcessStatus)
+		}
+		data.CorridorStatus[userID] = status
+		saveData()
+	}
+
+	// 确保 NoteImages map 存在
+	if data.NoteImages == nil {
+		data.NoteImages = make(map[int]*NoteImage)
+	}
+
+	// 统计用户快记的图片生成情况，并同时进行预过滤
+	var totalNotes, withImage, generating, failed, notSuitable, suitable int
+	needSave := false
+
+	for _, note := range data.Notes {
+		if note.UserID == userID {
+			totalNotes++
+
+			// 检查是否已有状态记录
+			if img, ok := data.NoteImages[note.ID]; ok {
+				switch img.Status {
+				case "completed":
+					withImage++
+				case "generating", "pending":
+					generating++
+				case "failed":
+					failed++
+				case "not_suitable":
+					notSuitable++
+				}
+			} else {
+				// 没有状态记录，进行预过滤并持久化结果
+				if isNoteSuitableForImage(note.Content) {
+					suitable++
+				} else {
+					// 标记为不适合并保存
+					data.NoteImages[note.ID] = &NoteImage{
+						NoteID: note.ID,
+						Status: "not_suitable",
+					}
+					notSuitable++
+					needSave = true
+				}
+			}
+		}
+	}
+
+	// 如果有新的过滤结果，保存数据
+	if needSave {
+		saveData()
+	}
+
+	response := map[string]interface{}{
+		"status":       status,
+		"total_notes":  totalNotes,
+		"with_image":   withImage,
+		"generating":   generating,
+		"failed":       failed,
+		"not_suitable": notSuitable,
+		"suitable":     suitable,                              // 适合生成但未处理的数量
+		"pending":      suitable + generating + failed,        // 真正待处理的 = 适合的 + 正在处理的 + 失败的（可重试）
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// startCorridorProcessHandler 启动时光回廊批量处理
+func startCorridorProcessHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	userID, _, err := validateToken(tokenString)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	dataMutex.Lock()
+
+	// 检查是否已有处理任务在运行
+	if data.CorridorStatus == nil {
+		data.CorridorStatus = make(map[int]*CorridorProcessStatus)
+	}
+	if status, ok := data.CorridorStatus[userID]; ok && status.Status == "processing" {
+		dataMutex.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "已有处理任务在运行中",
+		})
+		return
+	}
+
+	// 初始化 NoteImages map
+	if data.NoteImages == nil {
+		data.NoteImages = make(map[int]*NoteImage)
+	}
+
+	// 收集需要处理的快记
+	var notesToProcess []Note
+	for _, note := range data.Notes {
+		if note.UserID == userID {
+			// 跳过已处理的
+			if img, ok := data.NoteImages[note.ID]; ok {
+				if img.Status == "completed" || img.Status == "not_suitable" {
+					continue
+				}
+			}
+			// 检查是否适合生成图片
+			if isNoteSuitableForImage(note.Content) {
+				notesToProcess = append(notesToProcess, note)
+			} else {
+				// 标记为不适合
+				data.NoteImages[note.ID] = &NoteImage{
+					NoteID: note.ID,
+					Status: "not_suitable",
+				}
+			}
+		}
+	}
+
+	if len(notesToProcess) == 0 {
+		dataMutex.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "没有需要处理的快记",
+		})
+		return
+	}
+
+	// 初始化处理状态
+	status := &CorridorProcessStatus{
+		Status:         "processing",
+		TotalNotes:     len(notesToProcess),
+		ProcessedNotes: 0,
+		StartedAt:      time.Now().Format("2006-01-02 15:04:05"),
+	}
+	data.CorridorStatus[userID] = status
+	saveData()
+
+	dataMutex.Unlock()
+
+	// 标记活跃处理
+	corridorProcessMutex.Lock()
+	activeCorridorProcess[userID] = true
+	corridorProcessMutex.Unlock()
+
+	// 异步处理
+	go func() {
+		defer func() {
+			// 处理完成后移除活跃标记和暂停标记
+			corridorProcessMutex.Lock()
+			delete(activeCorridorProcess, userID)
+			delete(pausedCorridorProcess, userID)
+			corridorProcessMutex.Unlock()
+		}()
+
+		for _, note := range notesToProcess {
+			// 检查是否暂停
+			corridorProcessMutex.RLock()
+			isPaused := pausedCorridorProcess[userID]
+			corridorProcessMutex.RUnlock()
+
+			if isPaused {
+				// 暂停状态，等待恢复
+				dataMutex.Lock()
+				if status := data.CorridorStatus[userID]; status != nil {
+					status.Status = "paused"
+					saveData()
+				}
+				dataMutex.Unlock()
+
+				// 等待恢复或退出
+				for {
+					time.Sleep(500 * time.Millisecond)
+					corridorProcessMutex.RLock()
+					stillPaused := pausedCorridorProcess[userID]
+					stillActive := activeCorridorProcess[userID]
+					corridorProcessMutex.RUnlock()
+
+					if !stillActive {
+						// 任务被取消
+						log.Printf("Corridor processing cancelled for user %d", userID)
+						return
+					}
+					if !stillPaused {
+						// 恢复处理
+						dataMutex.Lock()
+						if status := data.CorridorStatus[userID]; status != nil {
+							status.Status = "processing"
+							saveData()
+						}
+						dataMutex.Unlock()
+						break
+					}
+				}
+			}
+
+			log.Printf("Processing image for note %d", note.ID)
+
+			noteImage, err := processNoteImage(note.ID, note.Content)
+			if err != nil {
+				log.Printf("Failed to process note %d: %v", note.ID, err)
+			}
+
+			dataMutex.Lock()
+			data.NoteImages[note.ID] = noteImage
+			status := data.CorridorStatus[userID]
+			status.ProcessedNotes++
+			status.LastProcessedAt = time.Now().Format("2006-01-02 15:04:05")
+
+			if noteImage.Status == "completed" {
+				status.SuccessCount++
+			} else if noteImage.Status == "failed" {
+				status.FailedCount++
+			}
+
+			saveData()
+			dataMutex.Unlock()
+
+			// 稍微间隔一下，避免请求过于频繁
+			time.Sleep(2 * time.Second)
+		}
+
+		// 处理完成
+		dataMutex.Lock()
+		status := data.CorridorStatus[userID]
+		status.Status = "completed"
+		status.LastProcessedAt = time.Now().Format("2006-01-02 15:04:05")
+		saveData()
+		dataMutex.Unlock()
+
+		log.Printf("Corridor processing completed for user %d", userID)
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":     true,
+		"message":     "开始处理",
+		"total_notes": len(notesToProcess),
+	})
+}
+
+// pauseCorridorProcessHandler 暂停/恢复时光回廊处理
+func pauseCorridorProcessHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	userID, _, err := validateToken(tokenString)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		Action string `json:"action"` // "pause" or "resume"
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	corridorProcessMutex.Lock()
+	isActive := activeCorridorProcess[userID]
+
+	if !isActive {
+		corridorProcessMutex.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "没有正在运行的处理任务",
+		})
+		return
+	}
+
+	if req.Action == "pause" {
+		pausedCorridorProcess[userID] = true
+		corridorProcessMutex.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "处理已暂停",
+		})
+	} else if req.Action == "resume" {
+		delete(pausedCorridorProcess, userID)
+		corridorProcessMutex.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"message": "处理已恢复",
+		})
+	} else {
+		corridorProcessMutex.Unlock()
+		http.Error(w, "Invalid action, use 'pause' or 'resume'", http.StatusBadRequest)
+	}
+}
+
+// getNoteImageHandler 获取单条快记的图片
+func getNoteImageHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	userID, _, err := validateToken(tokenString)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	// 从 URL 获取 note_id
+	noteIDStr := r.URL.Query().Get("note_id")
+	noteID, err := strconv.Atoi(noteIDStr)
+	if err != nil {
+		http.Error(w, "Invalid note_id", http.StatusBadRequest)
+		return
+	}
+
+	dataMutex.RLock()
+	defer dataMutex.RUnlock()
+
+	// 验证快记属于当前用户
+	var noteFound bool
+	for _, note := range data.Notes {
+		if note.ID == noteID && note.UserID == userID {
+			noteFound = true
+			break
+		}
+	}
+
+	if !noteFound {
+		http.Error(w, "Note not found", http.StatusNotFound)
+		return
+	}
+
+	var noteImage *NoteImage
+	if data.NoteImages != nil {
+		noteImage = data.NoteImages[noteID]
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(noteImage)
+}
+
+// getAllImagesHandler 批量获取用户所有快记的图片信息
+func getAllImagesHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	userID, _, err := validateToken(tokenString)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	dataMutex.RLock()
+	defer dataMutex.RUnlock()
+
+	// 收集用户所有快记的图片信息
+	type NoteWithImage struct {
+		NoteID    int        `json:"note_id"`
+		Content   string     `json:"content"`
+		CreatedAt string     `json:"created_at"`
+		Image     *NoteImage `json:"image"`
+	}
+
+	var results []NoteWithImage
+	for _, note := range data.Notes {
+		if note.UserID == userID {
+			var img *NoteImage
+			if data.NoteImages != nil {
+				img = data.NoteImages[note.ID]
+			}
+			// 只返回有图片信息的（不包括未处理的）
+			if img != nil && img.Status != "not_suitable" {
+				results = append(results, NoteWithImage{
+					NoteID:    note.ID,
+					Content:   note.Content,
+					CreatedAt: note.CreatedAt,
+					Image:     img,
+				})
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"images": results,
+		"count":  len(results),
+	})
+}
+
+// generateNoteImageHandler 为单条快记生成图片
+func generateNoteImageHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	authHeader := r.Header.Get("Authorization")
+	tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+	userID, _, err := validateToken(tokenString)
+	if err != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	var req struct {
+		NoteID int `json:"note_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	dataMutex.RLock()
+
+	// 查找快记
+	var targetNote *Note
+	for i := range data.Notes {
+		if data.Notes[i].ID == req.NoteID && data.Notes[i].UserID == userID {
+			targetNote = &data.Notes[i]
+			break
+		}
+	}
+
+	if targetNote == nil {
+		dataMutex.RUnlock()
+		http.Error(w, "Note not found", http.StatusNotFound)
+		return
+	}
+
+	content := targetNote.Content
+	dataMutex.RUnlock()
+
+	// 异步生成图片
+	go func() {
+		noteImage, err := processNoteImage(req.NoteID, content)
+		if err != nil {
+			log.Printf("Failed to generate image for note %d: %v", req.NoteID, err)
+		}
+
+		dataMutex.Lock()
+		if data.NoteImages == nil {
+			data.NoteImages = make(map[int]*NoteImage)
+		}
+		data.NoteImages[req.NoteID] = noteImage
+		saveData()
+		dataMutex.Unlock()
+	}()
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"message": "图片生成已开始",
+	})
+}
+
+// serveNoteImageHandler 提供本地图片访问
+func serveNoteImageHandler(w http.ResponseWriter, r *http.Request) {
+	// 从路径中提取文件名
+	path := strings.TrimPrefix(r.URL.Path, "/api/corridor/images/")
+	if path == "" {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// 安全检查：防止目录遍历
+	if strings.Contains(path, "..") {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	filepath := "./images/" + path
+	http.ServeFile(w, r, filepath)
+}
+
+// serveNoteThumbnailHandler 提供缩略图服务
+func serveNoteThumbnailHandler(w http.ResponseWriter, r *http.Request) {
+	// 从路径中提取文件名
+	path := strings.TrimPrefix(r.URL.Path, "/api/corridor/thumbnails/")
+	if path == "" {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	// 安全检查：防止目录遍历
+	if strings.Contains(path, "..") {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	filepath := "./images/thumbnails/" + path
+
+	// 设置缓存头
+	w.Header().Set("Cache-Control", "public, max-age=31536000")
+	http.ServeFile(w, r, filepath)
+}
+
 // ============ Main ============
 
 func main() {
@@ -4221,6 +5212,16 @@ func main() {
 	// 我的传奇 API
 	http.HandleFunc("/api/biography", enableCORS(getBiographyHandler))
 	http.HandleFunc("/api/biography/generate", enableCORS(generateBiographyHandler))
+
+	// 时光回廊 API
+	http.HandleFunc("/api/corridor/status", enableCORS(getCorridorStatusHandler))
+	http.HandleFunc("/api/corridor/start", enableCORS(startCorridorProcessHandler))
+	http.HandleFunc("/api/corridor/pause", enableCORS(pauseCorridorProcessHandler))
+	http.HandleFunc("/api/corridor/image", enableCORS(getNoteImageHandler))
+	http.HandleFunc("/api/corridor/all-images", enableCORS(getAllImagesHandler))
+	http.HandleFunc("/api/corridor/generate", enableCORS(generateNoteImageHandler))
+	http.HandleFunc("/api/corridor/images/", enableCORS(serveNoteImageHandler))
+	http.HandleFunc("/api/corridor/thumbnails/", enableCORS(serveNoteThumbnailHandler))
 
 	// Serve static files
 	fs := http.FileServer(http.Dir("../frontend"))
